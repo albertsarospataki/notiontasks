@@ -23,7 +23,13 @@ export function notion(): Client {
     throw new NotionNotConfiguredError();
   }
   if (!clientInstance) {
-    clientInstance = new Client({ auth: env.notionToken, notionVersion: '2022-06-28' });
+    clientInstance = new Client({
+      auth: env.notionToken,
+      notionVersion: '2022-06-28',
+      // Az SDK alapból a konzolra ír minden sikertelen kérést. A hibákat mi
+      // magunk fogalmazzuk meg és jelenítjük meg, a nyers üzenet csak zaj.
+      logger: () => {},
+    });
   }
   return clientInstance;
 }
@@ -67,13 +73,14 @@ export function schedule<T>(fn: () => Promise<T>): Promise<T> {
 function retryDelayMs(err: unknown, attempt: number): number | null {
   const backoff = Math.min(500 * 2 ** (attempt - 1), 15_000);
 
-  if (err instanceof APIResponseError) {
-    if (err.status === 429) {
-      const header = (err.headers as Record<string, string> | undefined)?.['retry-after'];
+  const status = httpStatus(err);
+  if (status !== null) {
+    if (status === 429) {
+      const header = (err as { headers?: Record<string, string> }).headers?.['retry-after'];
       const retryAfter = header ? Number(header) * 1000 : NaN;
       return Number.isFinite(retryAfter) ? Math.max(retryAfter, backoff) : backoff;
     }
-    if (err.status >= 500) return backoff;
+    if (status >= 500) return backoff;
     return null; // 4xx: jogosultság, nem létező objektum, hibás kérés — nincs értelme újrapróbálni
   }
 
@@ -88,18 +95,38 @@ function retryDelayMs(err: unknown, attempt: number): number | null {
 
 /** Igaz, ha az objektum nem érhető el az integráció számára (nincs megosztva / törölt). */
 export function isNotFound(err: unknown): boolean {
-  return err instanceof APIResponseError && (err.status === 404 || err.code === 'object_not_found');
+  return httpStatus(err) === 404 || (err as { code?: string } | null)?.code === 'object_not_found';
+}
+
+/**
+ * A HTTP státusz kiolvasása a hibából.
+ *
+ * Szándékosan nem `instanceof`-fal: ha az `@notionhq/client` egynél több
+ * példányban kerül a folyamatba (más-más függőségi ágon), az osztály nem
+ * ugyanaz, az `instanceof` hamis lesz, és a felhasználó a nyers SDK-üzenetet
+ * kapná a barátságos helyett. A `status` mező viszont mindig ott van.
+ */
+function httpStatus(err: unknown): number | null {
+  if (err instanceof APIResponseError) return err.status;
+  const status = (err as { status?: unknown } | null)?.status;
+  return typeof status === 'number' ? status : null;
 }
 
 /** Emberi hibaüzenet a UI-ra. */
 export function describeError(err: unknown): string {
   if (err instanceof NotionNotConfiguredError) return err.message;
-  if (err instanceof APIResponseError) {
-    if (err.status === 401) return 'A Notion token érvénytelen vagy visszavonták (401).';
-    if (err.status === 403) return 'Az integrációnak nincs jogosultsága ehhez a tartalomhoz (403).';
-    if (err.status === 404) return 'A Notion objektum nem található vagy nincs megosztva az integrációval (404).';
-    if (err.status === 429) return 'A Notion átmenetileg korlátozza a kéréseket (429). Próbáld később.';
-    return `Notion API hiba (${err.status}): ${err.message}`;
+
+  const status = httpStatus(err);
+  if (status !== null) {
+    if (status === 401 || status === 403) {
+      return 'A Notion elutasította a tokent (érvénytelen, visszavonták, vagy nincs jogosultsága). '
+        + 'Ellenőrizd a NOTION_TOKEN értékét az integráció beállításainál.';
+    }
+    if (status === 404) return 'A Notion objektum nem található, vagy nincs megosztva az integrációval (404).';
+    if (status === 429) return 'A Notion átmenetileg korlátozza a kéréseket (429). Próbáld később.';
+    const message = err instanceof Error ? err.message : String(err);
+    return `Notion API hiba (${status}): ${message}`;
   }
+
   return err instanceof Error ? err.message : String(err);
 }

@@ -68,9 +68,15 @@ cp .env.example .env
 
 ```bash
 npm install
+npm run doctor    # ellenőrzi a beállítást, és megmondja, mi hiányzik
 npm run sync      # első teljes szinkron (pár perc, a workspace méretétől függően)
 npm run dev       # http://localhost:3000
 ```
+
+A `npm run doctor` az első beállítás legjobb barátja: megnézi a Node-verziót, a
+tokent, az adatkönyvtárat, és — ami a leggyakoribb buktató — kiírja, **hány
+adatbázist lát valójában az integráció**, meg hogy melyiket minek ismerné fel.
+Ha nullát lát, a megosztás maradt el, és a parancs megmondja, hol pótold.
 
 ---
 
@@ -80,6 +86,7 @@ npm run dev       # http://localhost:3000
 |---|---|
 | `npm run dev` / `build` / `start` | A webfelület. |
 | `npm run sync` | Egyszeri szinkron. `npm run sync -- --full` teljes újraolvasás. |
+| `npm run doctor` | Beállítás-ellenőrzés: token, láthatóság, felismert szerepek. Ezzel kezdd. |
 | `npm run discover` | Csak felfedezés és besorolás — kiírja, mit talált és milyen magabiztossággal. |
 | `npm run insights` | Javaslatok újraszámolása a helyi tükörből, Notion-hívás nélkül. |
 | `npm run demo` | Élethű, kitalált adatokkal tölti fel a felületet — Notion nélkül is végignézhető. |
