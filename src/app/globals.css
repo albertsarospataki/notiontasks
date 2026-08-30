@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+/*
+  Cockpit-paletta. A felület sok sűrű információt mutat, ezért visszafogott
+  háttér és erős, de kevés kiemelőszín — a figyelem a tartalmon maradjon.
+*/
+@theme {
+  --color-ink-50: #f6f7f9;
+  --color-ink-100: #eceef2;
+  --color-ink-200: #d5d9e2;
+  --color-ink-300: #b0b7c6;
+  --color-ink-400: #7d8798;
+  --color-ink-500: #5a6474;
+  --color-ink-600: #414a58;
+  --color-ink-700: #2f3642;
+  --color-ink-800: #1e232c;
+  --color-ink-900: #14181f;
+  --color-ink-950: #0d1015;
+
+  --color-accent: #4f7cff;
+  --color-accent-soft: #eaf0ff;
+
+  --color-danger: #d8442f;
+  --color-danger-soft: #fdecea;
+  --color-warn: #b7791f;
+  --color-warn-soft: #fdf3e2;
+  --color-good: #1f7a4d;
+  --color-good-soft: #e6f5ed;
+  --color-muted-soft: #f1f3f7;
+}
+
+:root {
+  color-scheme: light;
+  --bg: var(--color-ink-50);
+  --surface: #ffffff;
+  --border: var(--color-ink-200);
+  --text: var(--color-ink-900);
+  --text-soft: var(--color-ink-500);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --bg: var(--color-ink-950);
+    --surface: var(--color-ink-900);
+    --border: var(--color-ink-700);
+    --text: var(--color-ink-100);
+    --text-soft: var(--color-ink-400);
+    --color-accent-soft: #1b2540;
+    --color-danger-soft: #2e1815;
+    --color-warn-soft: #2b2211;
+    --color-good-soft: #10261c;
+    --color-muted-soft: var(--color-ink-800);
+  }
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.surface {
+  background: var(--surface);
+  border: 1px solid var(--border);
+}
+
+.soft { color: var(--text-soft); }
+
+/* Vízszintesen görgethető tartalom (naptár, táblázat) sose tolja szét az oldalt. */
+.scroll-x { overflow-x: auto; }
+
+.tabular { font-variant-numeric: tabular-nums; }

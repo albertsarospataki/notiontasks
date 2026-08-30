@@ -1,0 +1,42 @@
+# Fly.io telepítési leírás.
+#
+# Fontos: a cockpit egyetlen SQLite fájlban tartja a tükröt, ezért PONTOSAN EGY
+# példány futhat. A `fly scale count 2` két gépet adna, két külön kötettel és két
+# külön adatbázissal — a felület ilyenkor kérésenként más állapotot mutatna.
+
+app = "notion-cockpit"
+primary_region = "waw"   # Varsó — a legközelebbi Fly-régió Budapesthez
+
+[build]
+
+[env]
+  DATA_DIR = "/data"
+  SYNC_INTERVAL_MINUTES = "10"
+  FULL_SYNC_INTERVAL_HOURS = "24"
+  TZ = "Europe/Budapest"
+
+# A tükör a kötetre kerül, így a telepítések és újraindítások nem törlik.
+[[mounts]]
+  source = "cockpit_data"
+  destination = "/data"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_start_machines = true
+  # A gép nem áll le tétlenségkor: a beépített ütemező csak futó folyamatban
+  # szinkronizál. Ha inkább külső cront használsz, ez igaz-ra állítható, és a
+  # SYNC_INTERVAL_MINUTES nullázható.
+  auto_stop_machines = false
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "15s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "512mb"
