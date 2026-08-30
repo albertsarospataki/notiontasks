@@ -49,8 +49,11 @@ mutató relation, akár a `Saját` címke jelöli.
 ```bash
 cp .env.example .env
 # töltsd ki legalább a NOTION_TOKEN és az OWNER_NAMES sort
-# helyi futtatáshoz: AUTH_DISABLED=true
 ```
+
+A saját gépeden ennyi elég: a fejlesztői szerver csak a localhoston hallgat,
+ezért ott nem kér jelszót. Élesítéskor viszont az `APP_PASSWORD` és a
+`SESSION_SECRET` kötelező — lásd lentebb.
 
 | Változó | Mire való |
 |---|---|
@@ -60,7 +63,7 @@ cp .env.example .env
 | `SYNC_INTERVAL_MINUTES` | Beépített háttér-szinkron periódusa. `0` = kikapcsolva (külső cronnal). |
 | `FULL_SYNC_INTERVAL_HOURS` | Milyen gyakran fusson teljes újraolvasás. Csak ez veszi észre a Notionből **törölt** sorokat. |
 | `APP_PASSWORD`, `SESSION_SECRET` | A belépés jelszava és a munkamenet-süti aláírókulcsa. **E kettő nélkül a szolgáltatás senkit nem enged be.** |
-| `AUTH_DISABLED` | `true` esetén nincs belépés. Csak helyi fejlesztéshez. |
+| `AUTH_DISABLED` | `true` esetén éles módban sincs belépés. Csak akkor, ha tudod, mit csinálsz. |
 | `SYNC_SECRET` | Gépi API-hozzáférés `Authorization: Bearer <secret>` fejléccel — külső cronnak. |
 | `WRITEBACK_DRY_RUN` | `true` esetén a jóváhagyott javaslatok nem íródnak ki, csak naplózódnak. Élesítés előtt érdemes. |
 
@@ -192,10 +195,12 @@ vagy határidő-mezővel.
 
 ## Élesítés — elérés bárhonnan
 
-A cockpit a teljes Notionödet mutatja, ezért **jelszóval védett, és zárva az
-alapértelmezett**: ha az `APP_PASSWORD` vagy a `SESSION_SECRET` hiányzik, a
-szolgáltatás nem enged be senkit, hanem kiírja, mi hiányzik. Egy elfelejtett
-környezeti változó így nem eredményezhet nyilvánosan olvasható Notiont.
+A cockpit a teljes Notionödet mutatja, ezért **éles módban jelszóval védett, és
+zárva az alapértelmezett**: ha az `APP_PASSWORD` vagy a `SESSION_SECRET`
+hiányzik, a szolgáltatás nem enged be senkit, hanem kiírja, mi hiányzik. Egy
+elfelejtett környezeti változó így nem eredményezhet nyilvánosan olvasható
+Notiont. (A saját gépeden futó `npm run dev` jelszó nélkül is megnyílik — ott a
+localhost az egyetlen hallgatott cím. Jelszót ott is lehet kérni: elég megadni.)
 
 A belépés egy jelszó, utána 30 napig érvényes, aláírt `HttpOnly` + `SameSite=Lax`
 süti — éles módban `Secure`. Öt hibás próbálkozás után az adott forrás negyed

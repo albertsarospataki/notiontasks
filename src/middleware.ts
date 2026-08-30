@@ -29,13 +29,18 @@ export async function middleware(request: NextRequest) {
 
   const password = process.env.APP_PASSWORD ?? '';
   const sessionSecret = process.env.SESSION_SECRET ?? '';
-  const authDisabled = process.env.AUTH_DISABLED === 'true';
+  const isProduction = process.env.NODE_ENV === 'production';
 
-  // Helyi fejlesztéshez kifejezetten kikapcsolható. Éles üzemben soha ne legyen bekapcsolva.
-  if (authDisabled) return NextResponse.next();
+  // Kifejezett kikapcsolás. Éles üzemben soha ne legyen bekapcsolva.
+  if (process.env.AUTH_DISABLED === 'true') return NextResponse.next();
 
-  // Zárva alapértelmezett: hiányos konfiguráció esetén nem engedünk be, és nem is
-  // hallgatunk róla — a hibaüzenet megmondja, mi hiányzik.
+  // Fejlesztői szerver (`npm run dev`) a saját gépeden, jelszó nélkül: itt a
+  // localhost az egyetlen hallgatott cím, és a beállítás elé tett jelszó csak
+  // felesleges akadály lenne. Jelszót itt is lehet kérni — elég megadni.
+  if (!isProduction && !password) return NextResponse.next();
+
+  // Éles üzemben viszont zárva az alapértelmezett: hiányos konfiguráció esetén
+  // nem engedünk be, és nem is hallgatunk róla.
   if (!password || !sessionSecret) {
     const missing = [!password ? 'APP_PASSWORD' : null, !sessionSecret ? 'SESSION_SECRET' : null]
       .filter(Boolean)
