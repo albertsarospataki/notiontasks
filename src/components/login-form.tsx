@@ -4,6 +4,25 @@ import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 /** Bejelentkezési űrlap. A jelszó soha nem kerül a címsorba, csak a kérés törzsébe. */
+/**
+ * A belépés utáni visszairányítás csak saját útvonalra mehet.
+ *
+ * A puszta „perjellel kezdődik" ellenőrzés kevés: a `//evil.com` és a
+ * `/\evil.com` alakot a böngészők protokoll-relatív címként értelmezik, azaz
+ * idegen kiszolgálóra vinnék a felhasználót. Ezért a címet feloldjuk a saját
+ * origin ellenében, és csak akkor fogadjuk el, ha tényleg ott maradt.
+ */
+function safeNext(raw: string | null): string {
+  if (!raw) return '/';
+  try {
+    const resolved = new URL(raw, window.location.origin);
+    if (resolved.origin !== window.location.origin) return '/';
+    return `${resolved.pathname}${resolved.search}`;
+  } catch {
+    return '/';
+  }
+}
+
 export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
@@ -27,10 +46,7 @@ export function LoginForm() {
         setPassword('');
         return;
       }
-      // A visszairányítást csak saját útvonalra engedjük — külső cím nem kerülhet ide.
-      const next = params.get('next');
-      const target = next && next.startsWith('/') && !next.startsWith('//') ? next : '/';
-      router.replace(target);
+      router.replace(safeNext(params.get('next')));
       router.refresh();
     } catch {
       setError('Hálózati hiba. Próbáld újra.');

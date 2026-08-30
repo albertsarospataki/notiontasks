@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { env } from '@/lib/env';
+import { secretsMatch } from '@/lib/auth/session';
 
 /** Egységes hibaválasz. */
 export function fail(message: string, status = 400): NextResponse {
@@ -12,9 +13,10 @@ export function fail(message: string, status = 400): NextResponse {
  * hívhatja a szinkront akkor is, ha a szolgáltatás publikusan elérhető.
  * Ha nincs beállítva, a védelem kikapcsolt (helyi, egyfelhasználós futtatás).
  */
-export function authorize(request: Request): boolean {
+export async function authorize(request: Request): Promise<boolean> {
   const secret = env.syncSecret;
   if (!secret) return true;
   const header = request.headers.get('authorization') ?? '';
-  return header === `Bearer ${secret}`;
+  if (!header.startsWith('Bearer ')) return false;
+  return secretsMatch(header.slice('Bearer '.length), secret);
 }

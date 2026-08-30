@@ -14,6 +14,7 @@ export const dynamic = 'force-dynamic';
 
 const MAX_ATTEMPTS = 5;
 const WINDOW_MS = 15 * 60_000;
+const FAILURE_DELAY_MS = 400;
 
 interface Attempts {
   count: number;
@@ -23,10 +24,24 @@ interface Attempts {
 const globalRef = globalThis as unknown as { __cockpitLoginAttempts?: Map<string, Attempts> };
 const attempts = (globalRef.__cockpitLoginAttempts ??= new Map<string, Attempts>());
 
+/**
+ * A kérés forrásának azonosítója a korláthoz.
+ *
+ * Csak olyan fejlécben bízunk, amit a *platform* ír: az `X-Forwarded-For`
+ * bármelyik elemét a kliens is elhelyezheti, tehát ha abból képeznénk kulcsot,
+ * a támadó minden kéréshez új „IP-t" találna ki, és a korlát semmit nem érne.
+ *
+ * Ha nincs megbízható fejléc, minden kérés EGY közös vödörbe számít. Ez
+ * szigorúbb — rossz proxy-beállításnál akár saját magadat is kizárhatja —, de a
+ * fordítottja rosszabb lenne: egy néma, megkerülhető korlát.
+ *
+ * Fordított proxy mögött állítsd be az `X-Real-IP` fejlécet (nginx:
+ * `proxy_set_header X-Real-IP $remote_addr;`). A Fly.io magától küldi a
+ * `Fly-Client-IP`-t, ott nincs teendő.
+ */
 function clientKey(request: Request): string {
-  const forwarded = request.headers.get('x-forwarded-for');
-  if (forwarded) return forwarded.split(',')[0].trim();
-  return request.headers.get('fly-client-ip') ?? request.headers.get('x-real-ip') ?? 'ismeretlen';
+  const trusted = request.headers.get('fly-client-ip') ?? request.headers.get('x-real-ip');
+  return trusted?.trim() || 'megbizhato-forras-nelkul';
 }
 
 function throttled(key: string, now: number): number | null {
@@ -81,6 +96,9 @@ export async function POST(request: Request) {
 
   if (!(await secretsMatch(submitted, password))) {
     recordFailure(key, now);
+    // Fix késleltetés minden hibás kísérletnél: a próbálgatás sebességét attól
+    // függetlenül megfogja, hogy a támadó tudja-e váltogatni a forrás-azonosítót.
+    await new Promise((resolve) => setTimeout(resolve, FAILURE_DELAY_MS));
     return NextResponse.json({ ok: false, error: 'Hibás jelszó.' }, { status: 401 });
   }
 

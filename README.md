@@ -190,10 +190,17 @@ alapértelmezett**: ha az `APP_PASSWORD` vagy a `SESSION_SECRET` hiányzik, a
 szolgáltatás nem enged be senkit, hanem kiírja, mi hiányzik. Egy elfelejtett
 környezeti változó így nem eredményezhet nyilvánosan olvasható Notiont.
 
-A belépés egy jelszó, utána 30 napig érvényes, aláírt `HttpOnly` süti. Öt hibás
-próbálkozás után az adott IP negyed órára kizárja magát. A `/api/health`
-egészség-ellenőrző az egyetlen nyilvános végpont, és semmit nem árul el a
-tartalomról.
+A belépés egy jelszó, utána 30 napig érvényes, aláírt `HttpOnly` + `SameSite=Lax`
+süti — éles módban `Secure`. Öt hibás próbálkozás után az adott forrás negyed
+órára kizárja magát, és minden hibás kísérlet fix késleltetést kap, ami a
+próbálgatás sebességét a forrás-azonosítótól függetlenül megfogja. A
+`/api/health` az egyetlen nyilvános végpont, és semmit nem árul el a tartalomról.
+
+Amit ez **nem** old meg: a kijelentkezés csak a böngésző sütijét törli, a kiadott
+token a lejáratáig érvényes marad. Ha egy eszközt elvesztesz, forgasd a
+`SESSION_SECRET`-et — ezzel minden kiadott munkamenet azonnal érvénytelen lesz.
+Több felhasználó, jogosultsági szintek és auditnapló nincs: ez egy embernek
+készült.
 
 ### Fly.io (ajánlott)
 
@@ -245,6 +252,18 @@ docker run -d --name cockpit -p 3000:3000 \
 A konténer a `node` felhasználóként fut, és a 3000-es porton figyel. VPS-en tegyél
 elé HTTPS-t végző fordított proxyt (Caddy vagy nginx) — a munkamenet-süti éles
 módban `Secure`, tehát sima HTTP-n nem megy át a belépés.
+
+**A proxynak `X-Real-IP` fejlécet kell küldenie**, különben a belépési korlát nem
+tudja megkülönböztetni a kérések forrását:
+
+```nginx
+proxy_set_header X-Real-IP $remote_addr;
+```
+
+Caddy ezt magától megteszi; a Fly.io a `Fly-Client-IP` fejlécet küldi, ott sincs
+teendő. Ha egyik sem érkezik, a cockpit nem esik vissza az `X-Forwarded-For`
+fejlécre — azt a kliens is hamisíthatja —, hanem minden kérést egy közös vödörbe
+számol, ami szigorúbb, de nem megkerülhető.
 
 A tartós lemez nem opcionális: nélküle minden újraindítás után nulláról épül fel
 a tükör, és elvesznek a kézi mezőleképezések meg a javaslat-döntések.

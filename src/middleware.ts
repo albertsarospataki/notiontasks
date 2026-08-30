@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server';
-import { SESSION_COOKIE, verifySessionToken } from '@/lib/auth/session';
+import { SESSION_COOKIE, secretsMatch, verifySessionToken } from '@/lib/auth/session';
 
 /**
  * Hozzáférés-védelem.
@@ -49,8 +49,13 @@ export async function middleware(request: NextRequest) {
 
   // Gépi hívás: a szinkron-titokkal hitelesített kérés süti nélkül is átmegy.
   const syncSecret = process.env.SYNC_SECRET ?? '';
-  if (syncSecret && request.headers.get('authorization') === `Bearer ${syncSecret}`) {
-    return NextResponse.next();
+  const authorization = request.headers.get('authorization') ?? '';
+  if (syncSecret && authorization.startsWith('Bearer ')) {
+    // Konstans idejű összevetés: a sima === az első eltérő bájtnál kilép, és a
+    // futásidőből bájtonként kitalálható lenne a titok.
+    if (await secretsMatch(authorization.slice('Bearer '.length), syncSecret)) {
+      return NextResponse.next();
+    }
   }
 
   const session = await verifySessionToken(sessionSecret, request.cookies.get(SESSION_COOKIE)?.value);

@@ -12,7 +12,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  if (!authorize(request)) return fail('Hiányzó vagy hibás hitelesítés.', 401);
+  if (!(await authorize(request))) return fail('Hiányzó vagy hibás hitelesítés.', 401);
 
   let mode: SyncMode | undefined;
   let onlyDatabaseIds: string[] | undefined;

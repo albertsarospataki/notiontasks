@@ -5,7 +5,7 @@ import { undoWriteback } from '@/lib/notion/writeback';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
-  if (!authorize(request)) return fail('Hiányzó vagy hibás hitelesítés.', 401);
+  if (!(await authorize(request))) return fail('Hiányzó vagy hibás hitelesítés.', 401);
   const { id } = await params;
 
   const logId = Number(id);
