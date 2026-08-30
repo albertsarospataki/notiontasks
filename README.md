@@ -49,6 +49,7 @@ mutató relation, akár a `Saját` címke jelöli.
 ```bash
 cp .env.example .env
 # töltsd ki legalább a NOTION_TOKEN és az OWNER_NAMES sort
+# helyi futtatáshoz: AUTH_DISABLED=true
 ```
 
 | Változó | Mire való |
@@ -58,7 +59,9 @@ cp .env.example .env
 | `DATA_DIR` | Hova kerüljön a helyi SQLite tükör (alap: `./data`). |
 | `SYNC_INTERVAL_MINUTES` | Beépített háttér-szinkron periódusa. `0` = kikapcsolva (külső cronnal). |
 | `FULL_SYNC_INTERVAL_HOURS` | Milyen gyakran fusson teljes újraolvasás. Csak ez veszi észre a Notionből **törölt** sorokat. |
-| `SYNC_SECRET` | Ha megadod, az írási végpontokhoz `Authorization: Bearer <secret>` kell. |
+| `APP_PASSWORD`, `SESSION_SECRET` | A belépés jelszava és a munkamenet-süti aláírókulcsa. **E kettő nélkül a szolgáltatás senkit nem enged be.** |
+| `AUTH_DISABLED` | `true` esetén nincs belépés. Csak helyi fejlesztéshez. |
+| `SYNC_SECRET` | Gépi API-hozzáférés `Authorization: Bearer <secret>` fejléccel — külső cronnak. |
 | `WRITEBACK_DRY_RUN` | `true` esetén a jóváhagyott javaslatok nem íródnak ki, csak naplózódnak. Élesítés előtt érdemes. |
 
 ### 3. Indítás
@@ -177,6 +180,83 @@ feladatok) · lejárt mérföldkő · futó projekt nyitott feladat nélkül · 
 
 *Rendszer:* bizonytalanul besorolt adatbázis · feladat-adatbázis hiányzó státusz-
 vagy határidő-mezővel.
+
+---
+
+## Élesítés — elérés bárhonnan
+
+A cockpit a teljes Notionödet mutatja, ezért **jelszóval védett, és zárva az
+alapértelmezett**: ha az `APP_PASSWORD` vagy a `SESSION_SECRET` hiányzik, a
+szolgáltatás nem enged be senkit, hanem kiírja, mi hiányzik. Egy elfelejtett
+környezeti változó így nem eredményezhet nyilvánosan olvasható Notiont.
+
+A belépés egy jelszó, utána 30 napig érvényes, aláírt `HttpOnly` süti. Öt hibás
+próbálkozás után az adott IP negyed órára kizárja magát. A `/api/health`
+egészség-ellenőrző az egyetlen nyilvános végpont, és semmit nem árul el a
+tartalomról.
+
+### Fly.io (ajánlott)
+
+Egyetlen mindig futó gép egy csatolt kötettel — a SQLite tükör így túléli a
+telepítéseket. Kell hozzá a [flyctl](https://fly.io/docs/flyctl/install/).
+
+```bash
+fly launch --no-deploy --copy-config --name <egyedi-név>
+fly volumes create cockpit_data --region waw --size 1
+
+fly secrets set \
+  NOTION_TOKEN='ntn_…' \
+  APP_PASSWORD='hosszú-egyedi-jelszó' \
+  SESSION_SECRET="$(node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))")" \
+  SYNC_SECRET="$(node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))")" \
+  OWNER_EMAIL='albert@sarospataki.hu' \
+  OWNER_NAMES='Albert Sárospataki'
+
+fly deploy
+fly open        # https://<egyedi-név>.fly.dev
+```
+
+Saját domain: `fly certs add cockpit.sarospataki.hu`, majd a kiírt CNAME
+felvétele a DNS-be.
+
+**Pontosan egy példány futhat.** A tükör egyetlen SQLite fájl a köteten; két gép
+két külön adatbázist jelentene, és a felület kérésenként más állapotot mutatna.
+Ezért ne futtass `fly scale count 2`-t. A `fly.toml` ennek megfelelően nem
+állítja le a gépet tétlenségkor — a beépített ütemező csak futó folyamatban
+szinkronizál.
+
+### Bármely más hoszting
+
+A `Dockerfile` önálló: ahol konténert lehet futtatni **tartós lemezzel**, ott
+elmegy — Railway, Render, Coolify, vagy egy sima VPS:
+
+```bash
+docker build -t notion-cockpit .
+docker run -d --name cockpit -p 3000:3000 \
+  -v cockpit_data:/data \
+  -e NOTION_TOKEN='ntn_…' \
+  -e APP_PASSWORD='hosszú-egyedi-jelszó' \
+  -e SESSION_SECRET='…' \
+  -e OWNER_NAMES='Albert Sárospataki' \
+  --restart unless-stopped \
+  notion-cockpit
+```
+
+A konténer a `node` felhasználóként fut, és a 3000-es porton figyel. VPS-en tegyél
+elé HTTPS-t végző fordított proxyt (Caddy vagy nginx) — a munkamenet-süti éles
+módban `Secure`, tehát sima HTTP-n nem megy át a belépés.
+
+A tartós lemez nem opcionális: nélküle minden újraindítás után nulláról épül fel
+a tükör, és elvesznek a kézi mezőleképezések meg a javaslat-döntések.
+
+### Mentés
+
+Minden a köteten lévő egyetlen fájlban van:
+
+```bash
+fly ssh console -C "cat /data/cockpit.sqlite" > cockpit-mentés.sqlite   # Fly
+docker cp cockpit:/data/cockpit.sqlite ./cockpit-mentés.sqlite          # Docker
+```
 
 ---
 

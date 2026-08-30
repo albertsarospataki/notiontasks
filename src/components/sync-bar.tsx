@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { LogoutButton } from './logout-button';
 
 interface Status {
   configured: boolean;
@@ -123,6 +124,7 @@ export function SyncBar() {
         >
           Teljes
         </button>
+        <LogoutButton />
       </span>
 
       {status.errorsByDatabase.length > 0 && (
